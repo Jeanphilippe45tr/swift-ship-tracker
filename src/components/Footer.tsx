@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Package, Mail, Phone, MapPin } from 'lucide-react';
+import { Mail, Phone, MapPin } from 'lucide-react';
+import logo from '@/assets/logo.png';
 
 const Footer: React.FC = () => (
   <footer className="bg-primary text-primary-foreground">
@@ -8,12 +9,10 @@ const Footer: React.FC = () => (
       <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
         <div>
           <div className="flex items-center gap-2 mb-4">
-            <div className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center">
-              <Package className="w-5 h-5 text-secondary-foreground" />
-            </div>
+            <img src={logo} alt="FastTrackerPro" className="h-9 w-9 rounded-lg object-contain bg-card/10" width={36} height={36} />
             <span className="font-bold text-lg">FastTrackerPro</span>
           </div>
-          <p className="text-sm opacity-80">Your trusted partner in global logistics and package delivery. Fast, reliable, and transparent shipping solutions.</p>
+          <p className="text-sm opacity-80">Your trusted partner in global logistics and package delivery. Fast, reliable, and transparent shipping solutions across 200+ countries.</p>
         </div>
         <div>
           <h4 className="font-semibold mb-4">Quick Links</h4>
@@ -28,8 +27,9 @@ const Footer: React.FC = () => (
           <h4 className="font-semibold mb-4">Services</h4>
           <div className="space-y-2 text-sm opacity-80">
             <p>Express Delivery</p>
-            <p>Freight Shipping</p>
-            <p>Warehousing</p>
+            <p>Air & Sea Freight</p>
+            <p>Warehousing & Fulfillment</p>
+            <p>Customs Brokerage</p>
             <p>Last Mile Delivery</p>
           </div>
         </div>
@@ -43,7 +43,7 @@ const Footer: React.FC = () => (
         </div>
       </div>
       <div className="border-t border-primary-foreground/20 mt-8 pt-8 text-center text-sm opacity-60">
-        © {new Date().getFullYear()} FastTrackerPro. All rights reserved.
+        © {new Date().getFullYear()} FastTrackerPro. All rights reserved. | ISO 9001 & ISO 14001 Certified
       </div>
     </div>
   </footer>
