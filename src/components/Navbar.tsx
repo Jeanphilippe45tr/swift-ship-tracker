@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Package, Menu, X, Shield, MessageSquare } from 'lucide-react';
+import { Menu, X, Shield, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useApp } from '@/context/AppContext';
+import logo from '@/assets/logo.png';
 
 const Navbar: React.FC = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -24,9 +25,7 @@ const Navbar: React.FC = () => {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-lg gradient-primary flex items-center justify-center">
-              <Package className="w-5 h-5 text-primary-foreground" />
-            </div>
+            <img src={logo} alt="FastTrackerPro" className="h-9 w-9 rounded-lg object-contain" width={36} height={36} />
             <span className="font-bold text-lg text-foreground">Fast<span className="text-secondary">Tracker</span>Pro</span>
           </Link>
 

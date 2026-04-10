@@ -66,14 +66,9 @@ const TrackingMap: React.FC<TrackingMapProps> = ({ originCoords, destCoords, cur
       bounds.push(currentCoords);
     }
 
-    // Draw route
-    if (route && route.length > 1) {
-      L.polyline(route, { color: '#1e3a5f', weight: 3, opacity: 0.7, dashArray: '10, 5' }).addTo(map);
-    } else if (originCoords && destCoords) {
-      // Draw a straight line if no route
-      L.polyline([originCoords, destCoords], { color: '#1e3a5f', weight: 3, opacity: 0.5, dashArray: '10, 5' }).addTo(map);
-      
-      // If current position, draw traveled portion
+    // Draw straight line immediately for instant visual feedback
+    if (originCoords && destCoords) {
+      L.polyline([originCoords, destCoords], { color: '#1e3a5f', weight: 3, opacity: 0.3, dashArray: '10, 5' }).addTo(map);
       if (currentCoords) {
         L.polyline([originCoords, currentCoords], { color: '#f97316', weight: 4, opacity: 0.8 }).addTo(map);
       }
@@ -85,15 +80,15 @@ const TrackingMap: React.FC<TrackingMapProps> = ({ originCoords, destCoords, cur
       map.setView([20, 0], 2);
     }
 
-    // Fetch real route from OSRM
+    // Fetch real route from OSRM in background (non-blocking)
     if (originCoords && destCoords) {
+      const controller = new AbortController();
       const url = `https://router.project-osrm.org/route/v1/driving/${originCoords[1]},${originCoords[0]};${destCoords[1]},${destCoords[0]}?overview=full&geometries=geojson`;
-      fetch(url)
+      fetch(url, { signal: controller.signal })
         .then(r => r.json())
         .then(data => {
           if (data.routes && data.routes[0]) {
             const coords = data.routes[0].geometry.coordinates.map((c: number[]) => [c[1], c[0]] as [number, number]);
-            // Remove old polylines and add real route
             map.eachLayer(layer => {
               if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
                 map.removeLayer(layer);
@@ -101,12 +96,19 @@ const TrackingMap: React.FC<TrackingMapProps> = ({ originCoords, destCoords, cur
             });
             L.polyline(coords, { color: '#1e3a5f', weight: 3, opacity: 0.6, dashArray: '8, 4' }).addTo(map);
             if (currentCoords) {
-              // Find closest point on route to current position and draw traveled path
               L.polyline([originCoords, currentCoords], { color: '#f97316', weight: 4, opacity: 0.9 }).addTo(map);
             }
           }
         })
-        .catch(() => {/* fallback to straight line */});
+        .catch(() => {});
+
+      return () => {
+        controller.abort();
+        if (mapInstance.current) {
+          mapInstance.current.remove();
+          mapInstance.current = null;
+        }
+      };
     }
 
     return () => {

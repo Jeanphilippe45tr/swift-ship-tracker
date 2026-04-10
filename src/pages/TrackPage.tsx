@@ -13,7 +13,7 @@ import ChatWidget from '@/components/ChatWidget';
 const statusConfig: Record<string, { color: string; icon: React.ElementType; label: string }> = {
   pending: { color: 'bg-warning text-warning-foreground', icon: Clock, label: 'Pending' },
   in_transit: { color: 'bg-info text-info-foreground', icon: Package, label: 'In Transit' },
-  paused: { color: 'bg-destructive text-destructive-foreground', icon: Pause, label: 'Paused' },
+  paused: { color: 'bg-destructive text-destructive-foreground', icon: Pause, label: 'On Hold' },
   delivered: { color: 'bg-success text-success-foreground', icon: CheckCircle, label: 'Delivered' },
   cancelled: { color: 'bg-muted text-muted-foreground', icon: AlertCircle, label: 'Cancelled' },
 };
@@ -24,7 +24,7 @@ const TrackPage: React.FC = () => {
   const [shipment, setShipment] = useState<Shipment | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
-  const { getShipmentByTracking } = useApp();
+  const { getShipmentByTracking, loading } = useApp();
 
   useEffect(() => {
     const id = searchParams.get('id');
@@ -32,9 +32,9 @@ const TrackPage: React.FC = () => {
       setTrackingInput(id);
       const found = getShipmentByTracking(id);
       setShipment(found || null);
-      setNotFound(!found);
+      setNotFound(!found && !loading);
     }
-  }, [searchParams, getShipmentByTracking]);
+  }, [searchParams, getShipmentByTracking, loading]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,12 +63,16 @@ const TrackPage: React.FC = () => {
             <Button type="submit" className="h-12 px-6 bg-secondary text-secondary-foreground hover:bg-secondary/90">Track</Button>
           </form>
 
-          {notFound && (
+          {loading && trackingInput && (
+            <div className="text-center py-8 text-muted-foreground">Loading shipment data...</div>
+          )}
+
+          {notFound && !loading && (
             <Card className="mb-8 border-destructive/30">
               <CardContent className="py-8 text-center">
                 <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-3" />
                 <h3 className="font-semibold text-lg text-foreground mb-1">Package Not Found</h3>
-                <p className="text-muted-foreground text-sm">Please check your tracking number and try again. Try: FTP-DEMO1234</p>
+                <p className="text-muted-foreground text-sm">Please check your tracking number and try again.</p>
               </CardContent>
             </Card>
           )}
@@ -101,12 +105,10 @@ const TrackPage: React.FC = () => {
                       <div className="h-full bg-secondary rounded-full transition-all duration-500" style={{ width: `${shipment.progress}%` }} />
                     </div>
                   </div>
+                  {/* Only show pause reason, no header */}
                   {shipment.status === 'paused' && shipment.pauseReason && (
                     <div className="mt-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-                      <div className="flex items-center gap-2 text-destructive text-sm font-medium">
-                        <Pause className="w-4 h-4" /> Shipment Paused
-                      </div>
-                      <p className="text-sm text-muted-foreground mt-1">Reason: {shipment.pauseReason}</p>
+                      <p className="text-sm text-muted-foreground">{shipment.pauseReason}</p>
                     </div>
                   )}
                 </CardContent>

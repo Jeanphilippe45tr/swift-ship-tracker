@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface Shipment {
   id: string;
@@ -12,7 +13,7 @@ export interface Shipment {
   currentCoords: [number, number] | null;
   status: 'pending' | 'in_transit' | 'paused' | 'delivered' | 'cancelled';
   pauseReason?: string;
-  progress: number; // 0-100
+  progress: number;
   estimatedArrival: string;
   createdAt: string;
   updatedAt: string;
@@ -43,6 +44,7 @@ interface AppState {
   shipments: Shipment[];
   messages: ChatMessage[];
   isAdminLoggedIn: boolean;
+  loading: boolean;
   addShipment: (shipment: Shipment) => void;
   updateShipment: (id: string, updates: Partial<Shipment>) => void;
   deleteShipment: (id: string) => void;
@@ -60,76 +62,135 @@ const generateTrackingNumber = () => {
   return `${prefix}-${num}`;
 };
 
-const sampleShipments: Shipment[] = [
-  {
-    id: '1',
-    trackingNumber: 'FTP-DEMO1234',
-    clientName: 'John Doe',
-    clientEmail: 'john@example.com',
-    origin: 'New York, USA',
-    destination: 'London, UK',
-    originCoords: [40.7128, -74.006],
-    destCoords: [51.5074, -0.1278],
-    currentCoords: [45.0, -40.0],
-    status: 'in_transit',
-    progress: 55,
-    estimatedArrival: '2026-04-15',
-    createdAt: '2026-04-05',
-    updatedAt: '2026-04-09',
-    weight: '12.5 kg',
-    dimensions: '40x30x20 cm',
-    packageType: 'Standard Box',
-    route: [],
-    history: [
-      { id: '1', timestamp: '2026-04-05 08:00', status: 'Package received', location: 'New York, USA', description: 'Package picked up from sender' },
-      { id: '2', timestamp: '2026-04-06 14:00', status: 'In transit', location: 'JFK Airport', description: 'Package cleared customs and loaded' },
-      { id: '3', timestamp: '2026-04-08 10:00', status: 'In transit', location: 'Mid-Atlantic', description: 'Package in transit via air freight' },
-    ],
-  },
-  {
-    id: '2',
-    trackingNumber: 'FTP-DEMO5678',
-    clientName: 'Jane Smith',
-    clientEmail: 'jane@example.com',
-    origin: 'Paris, France',
-    destination: 'Tokyo, Japan',
-    originCoords: [48.8566, 2.3522],
-    destCoords: [35.6762, 139.6503],
-    currentCoords: [48.8566, 2.3522],
-    status: 'pending',
-    progress: 5,
-    estimatedArrival: '2026-04-20',
-    createdAt: '2026-04-08',
-    updatedAt: '2026-04-09',
-    weight: '3.2 kg',
-    dimensions: '25x15x10 cm',
-    packageType: 'Envelope',
-    route: [],
-    history: [
-      { id: '1', timestamp: '2026-04-08 16:00', status: 'Order placed', location: 'Paris, France', description: 'Shipment order created' },
-    ],
-  },
-];
+// Convert DB row to Shipment
+const rowToShipment = (row: any): Shipment => ({
+  id: row.id,
+  trackingNumber: row.tracking_number,
+  clientName: row.client_name,
+  clientEmail: row.client_email || '',
+  origin: row.origin,
+  destination: row.destination,
+  originCoords: row.origin_coords as [number, number] | null,
+  destCoords: row.dest_coords as [number, number] | null,
+  currentCoords: row.current_coords as [number, number] | null,
+  status: row.status,
+  pauseReason: row.pause_reason || undefined,
+  progress: row.progress,
+  estimatedArrival: row.estimated_arrival || '',
+  createdAt: row.created_at?.split('T')[0] || '',
+  updatedAt: row.updated_at?.split('T')[0] || '',
+  weight: row.weight || '',
+  dimensions: row.dimensions || '',
+  packageType: row.package_type || 'Standard Box',
+  route: (row.route as [number, number][]) || [],
+  history: (row.history as ShipmentEvent[]) || [],
+});
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [shipments, setShipments] = useState<Shipment[]>(sampleShipments);
+  const [shipments, setShipments] = useState<Shipment[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const addShipment = useCallback((shipment: Shipment) => {
-    setShipments(prev => [...prev, shipment]);
+  // Load shipments from DB
+  useEffect(() => {
+    const fetchData = async () => {
+      const { data: shipmentRows } = await supabase.from('shipments').select('*').order('created_at', { ascending: false });
+      if (shipmentRows) setShipments(shipmentRows.map(rowToShipment));
+
+      const { data: msgRows } = await supabase.from('chat_messages').select('*').order('created_at', { ascending: true });
+      if (msgRows) setMessages(msgRows.map((m: any) => ({
+        id: m.id,
+        shipmentId: m.shipment_id,
+        sender: m.sender as 'admin' | 'client',
+        message: m.message,
+        timestamp: new Date(m.created_at).toLocaleString(),
+      })));
+      setLoading(false);
+    };
+    fetchData();
+
+    // Realtime chat subscription
+    const channel = supabase
+      .channel('chat-realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, (payload) => {
+        const m = payload.new as any;
+        setMessages(prev => {
+          if (prev.some(msg => msg.id === m.id)) return prev;
+          return [...prev, {
+            id: m.id,
+            shipmentId: m.shipment_id,
+            sender: m.sender,
+            message: m.message,
+            timestamp: new Date(m.created_at).toLocaleString(),
+          }];
+        });
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
-  const updateShipment = useCallback((id: string, updates: Partial<Shipment>) => {
-    setShipments(prev => prev.map(s => s.id === id ? { ...s, ...updates, updatedAt: new Date().toISOString() } : s));
+  const addShipment = useCallback(async (shipment: Shipment) => {
+    setShipments(prev => [shipment, ...prev]);
+    await supabase.from('shipments').insert({
+      id: shipment.id,
+      tracking_number: shipment.trackingNumber,
+      client_name: shipment.clientName,
+      client_email: shipment.clientEmail,
+      origin: shipment.origin,
+      destination: shipment.destination,
+      origin_coords: shipment.originCoords as any,
+      dest_coords: shipment.destCoords as any,
+      current_coords: shipment.currentCoords as any,
+      status: shipment.status,
+      pause_reason: shipment.pauseReason || null,
+      progress: shipment.progress,
+      estimated_arrival: shipment.estimatedArrival,
+      weight: shipment.weight,
+      dimensions: shipment.dimensions,
+      package_type: shipment.packageType,
+      route: shipment.route as any,
+      history: shipment.history as any,
+    });
   }, []);
 
-  const deleteShipment = useCallback((id: string) => {
+  const updateShipment = useCallback(async (id: string, updates: Partial<Shipment>) => {
+    setShipments(prev => prev.map(s => s.id === id ? { ...s, ...updates, updatedAt: new Date().toISOString().split('T')[0] } : s));
+    const dbUpdates: any = {};
+    if (updates.trackingNumber !== undefined) dbUpdates.tracking_number = updates.trackingNumber;
+    if (updates.clientName !== undefined) dbUpdates.client_name = updates.clientName;
+    if (updates.clientEmail !== undefined) dbUpdates.client_email = updates.clientEmail;
+    if (updates.origin !== undefined) dbUpdates.origin = updates.origin;
+    if (updates.destination !== undefined) dbUpdates.destination = updates.destination;
+    if (updates.originCoords !== undefined) dbUpdates.origin_coords = updates.originCoords;
+    if (updates.destCoords !== undefined) dbUpdates.dest_coords = updates.destCoords;
+    if (updates.currentCoords !== undefined) dbUpdates.current_coords = updates.currentCoords;
+    if (updates.status !== undefined) dbUpdates.status = updates.status;
+    if (updates.pauseReason !== undefined) dbUpdates.pause_reason = updates.pauseReason;
+    if (updates.progress !== undefined) dbUpdates.progress = updates.progress;
+    if (updates.estimatedArrival !== undefined) dbUpdates.estimated_arrival = updates.estimatedArrival;
+    if (updates.weight !== undefined) dbUpdates.weight = updates.weight;
+    if (updates.dimensions !== undefined) dbUpdates.dimensions = updates.dimensions;
+    if (updates.packageType !== undefined) dbUpdates.package_type = updates.packageType;
+    if (updates.route !== undefined) dbUpdates.route = updates.route;
+    if (updates.history !== undefined) dbUpdates.history = updates.history;
+    await supabase.from('shipments').update(dbUpdates).eq('id', id);
+  }, []);
+
+  const deleteShipment = useCallback(async (id: string) => {
     setShipments(prev => prev.filter(s => s.id !== id));
+    await supabase.from('shipments').delete().eq('id', id);
   }, []);
 
-  const addMessage = useCallback((msg: ChatMessage) => {
+  const addMessage = useCallback(async (msg: ChatMessage) => {
     setMessages(prev => [...prev, msg]);
+    await supabase.from('chat_messages').insert({
+      id: msg.id,
+      shipment_id: msg.shipmentId,
+      sender: msg.sender,
+      message: msg.message,
+    });
   }, []);
 
   const loginAdmin = useCallback((username: string, password: string) => {
@@ -150,7 +211,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   return (
     <AppContext.Provider value={{
-      shipments, messages, isAdminLoggedIn,
+      shipments, messages, isAdminLoggedIn, loading,
       addShipment, updateShipment, deleteShipment,
       addMessage, loginAdmin, logoutAdmin, getShipmentByTracking
     }}>
