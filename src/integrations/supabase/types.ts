@@ -14,7 +14,107 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      chat_messages: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          sender: string
+          shipment_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          sender: string
+          shipment_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          sender?: string
+          shipment_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shipments: {
+        Row: {
+          client_email: string
+          client_name: string
+          created_at: string
+          current_coords: Json | null
+          dest_coords: Json | null
+          destination: string
+          dimensions: string | null
+          estimated_arrival: string | null
+          history: Json | null
+          id: string
+          origin: string
+          origin_coords: Json | null
+          package_type: string | null
+          pause_reason: string | null
+          progress: number
+          route: Json | null
+          status: string
+          tracking_number: string
+          updated_at: string
+          weight: string | null
+        }
+        Insert: {
+          client_email?: string
+          client_name: string
+          created_at?: string
+          current_coords?: Json | null
+          dest_coords?: Json | null
+          destination: string
+          dimensions?: string | null
+          estimated_arrival?: string | null
+          history?: Json | null
+          id?: string
+          origin: string
+          origin_coords?: Json | null
+          package_type?: string | null
+          pause_reason?: string | null
+          progress?: number
+          route?: Json | null
+          status?: string
+          tracking_number: string
+          updated_at?: string
+          weight?: string | null
+        }
+        Update: {
+          client_email?: string
+          client_name?: string
+          created_at?: string
+          current_coords?: Json | null
+          dest_coords?: Json | null
+          destination?: string
+          dimensions?: string | null
+          estimated_arrival?: string | null
+          history?: Json | null
+          id?: string
+          origin?: string
+          origin_coords?: Json | null
+          package_type?: string | null
+          pause_reason?: string | null
+          progress?: number
+          route?: Json | null
+          status?: string
+          tracking_number?: string
+          updated_at?: string
+          weight?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
