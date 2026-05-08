@@ -38,20 +38,47 @@ export interface ChatMessage {
   sender: 'admin' | 'client';
   message: string;
   timestamp: string;
+  readByAdmin?: boolean;
+  readByClient?: boolean;
+}
+
+export interface TicketItem {
+  description: string;
+  amount: number;
+}
+
+export interface Ticket {
+  id: string;
+  shipmentId: string;
+  ticketNumber: string;
+  ticketType: 'paid' | 'pending';
+  title: string;
+  amount: number;
+  currency: string;
+  items: TicketItem[];
+  notes: string;
+  issuedTo: string;
+  issuedBy: string;
+  createdAt: string;
 }
 
 interface AppState {
   shipments: Shipment[];
   messages: ChatMessage[];
+  tickets: Ticket[];
   isAdminLoggedIn: boolean;
   loading: boolean;
   addShipment: (shipment: Shipment) => void;
   updateShipment: (id: string, updates: Partial<Shipment>) => void;
   deleteShipment: (id: string) => void;
   addMessage: (msg: ChatMessage) => void;
+  markMessagesRead: (shipmentId: string, role: 'admin' | 'client') => void;
+  addTicket: (ticket: Ticket) => void;
+  deleteTicket: (id: string) => void;
   loginAdmin: (username: string, password: string) => boolean;
   logoutAdmin: () => void;
   getShipmentByTracking: (tracking: string) => Shipment | undefined;
+  getTicketsForShipment: (shipmentId: string) => Ticket[];
 }
 
 const AppContext = createContext<AppState | null>(null);
@@ -89,6 +116,7 @@ const rowToShipment = (row: any): Shipment => ({
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -105,6 +133,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         sender: m.sender as 'admin' | 'client',
         message: m.message,
         timestamp: new Date(m.created_at).toLocaleString(),
+        readByAdmin: m.read_by_admin,
+        readByClient: m.read_by_client,
+      })));
+
+      const { data: ticketRows } = await supabase.from('tickets').select('*').order('created_at', { ascending: false });
+      if (ticketRows) setTickets(ticketRows.map((t: any) => ({
+        id: t.id,
+        shipmentId: t.shipment_id,
+        ticketNumber: t.ticket_number,
+        ticketType: t.ticket_type as 'paid' | 'pending',
+        title: t.title,
+        amount: Number(t.amount),
+        currency: t.currency,
+        items: (t.items as TicketItem[]) || [],
+        notes: t.notes || '',
+        issuedTo: t.issued_to || '',
+        issuedBy: t.issued_by || 'FastTrackerPro Admin',
+        createdAt: t.created_at,
       })));
       setLoading(false);
     };
@@ -123,8 +169,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             sender: m.sender,
             message: m.message,
             timestamp: new Date(m.created_at).toLocaleString(),
+            readByAdmin: m.read_by_admin,
+            readByClient: m.read_by_client,
           }];
         });
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chat_messages' }, (payload) => {
+        const m = payload.new as any;
+        setMessages(prev => prev.map(msg => msg.id === m.id ? { ...msg, readByAdmin: m.read_by_admin, readByClient: m.read_by_client } : msg));
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const t = payload.new as any;
+          setTickets(prev => prev.some(x => x.id === t.id) ? prev : [{
+            id: t.id, shipmentId: t.shipment_id, ticketNumber: t.ticket_number,
+            ticketType: t.ticket_type, title: t.title, amount: Number(t.amount),
+            currency: t.currency, items: t.items || [], notes: t.notes || '',
+            issuedTo: t.issued_to || '', issuedBy: t.issued_by || '', createdAt: t.created_at,
+          }, ...prev]);
+        } else if (payload.eventType === 'DELETE') {
+          setTickets(prev => prev.filter(x => x.id !== (payload.old as any).id));
+        }
       })
       .subscribe();
 
@@ -190,11 +255,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       shipment_id: msg.shipmentId,
       sender: msg.sender,
       message: msg.message,
+      read_by_admin: msg.sender === 'admin',
+      read_by_client: msg.sender === 'client',
     });
   }, []);
 
+  const markMessagesRead = useCallback(async (shipmentId: string, role: 'admin' | 'client') => {
+    const field = role === 'admin' ? 'read_by_admin' : 'read_by_client';
+    setMessages(prev => prev.map(m => m.shipmentId === shipmentId
+      ? { ...m, [role === 'admin' ? 'readByAdmin' : 'readByClient']: true } : m));
+    await supabase.from('chat_messages').update({ [field]: true }).eq('shipment_id', shipmentId);
+  }, []);
+
+  const addTicket = useCallback(async (ticket: Ticket) => {
+    setTickets(prev => [ticket, ...prev]);
+    await supabase.from('tickets').insert({
+      id: ticket.id,
+      shipment_id: ticket.shipmentId,
+      ticket_number: ticket.ticketNumber,
+      ticket_type: ticket.ticketType,
+      title: ticket.title,
+      amount: ticket.amount,
+      currency: ticket.currency,
+      items: ticket.items as any,
+      notes: ticket.notes,
+      issued_to: ticket.issuedTo,
+      issued_by: ticket.issuedBy,
+    });
+  }, []);
+
+  const deleteTicket = useCallback(async (id: string) => {
+    setTickets(prev => prev.filter(t => t.id !== id));
+    await supabase.from('tickets').delete().eq('id', id);
+  }, []);
+
   const loginAdmin = useCallback((username: string, password: string) => {
-    if (username === 'Makoun237' && password === 'Makoun237@p') {
+    if (username === 'jeanphilippe' && password === 'makoun237') {
       setIsAdminLoggedIn(true);
       return true;
     }
@@ -209,11 +305,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return shipments.find(s => s.trackingNumber.toLowerCase() === tracking.toLowerCase());
   }, [shipments]);
 
+  const getTicketsForShipment = useCallback((shipmentId: string) => {
+    return tickets.filter(t => t.shipmentId === shipmentId);
+  }, [tickets]);
+
   return (
     <AppContext.Provider value={{
-      shipments, messages, isAdminLoggedIn, loading,
+      shipments, messages, tickets, isAdminLoggedIn, loading,
       addShipment, updateShipment, deleteShipment,
-      addMessage, loginAdmin, logoutAdmin, getShipmentByTracking
+      addMessage, markMessagesRead, addTicket, deleteTicket,
+      loginAdmin, logoutAdmin, getShipmentByTracking, getTicketsForShipment,
     }}>
       {children}
     </AppContext.Provider>
