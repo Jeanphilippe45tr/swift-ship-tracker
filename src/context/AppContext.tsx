@@ -261,10 +261,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const markMessagesRead = useCallback(async (shipmentId: string, role: 'admin' | 'client') => {
-    const field = role === 'admin' ? 'read_by_admin' : 'read_by_client';
     setMessages(prev => prev.map(m => m.shipmentId === shipmentId
       ? { ...m, [role === 'admin' ? 'readByAdmin' : 'readByClient']: true } : m));
-    await supabase.from('chat_messages').update({ [field]: true }).eq('shipment_id', shipmentId);
+    if (role === 'admin') {
+      await supabase.from('chat_messages').update({ read_by_admin: true }).eq('shipment_id', shipmentId);
+    } else {
+      await supabase.from('chat_messages').update({ read_by_client: true }).eq('shipment_id', shipmentId);
+    }
   }, []);
 
   const addTicket = useCallback(async (ticket: Ticket) => {
