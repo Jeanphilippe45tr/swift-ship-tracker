@@ -7,8 +7,9 @@ import logo from '@/assets/logo.png';
 
 const Navbar: React.FC = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { isAdminLoggedIn, logoutAdmin } = useApp();
+  const { isAdminLoggedIn, logoutAdmin, messages } = useApp();
   const location = useLocation();
+  const adminUnread = messages.filter(m => m.sender === 'client' && !m.readByAdmin).length;
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -54,6 +55,11 @@ const Navbar: React.FC = () => {
                 <Link to="/admin/chat">
                   <Button variant="outline" size="sm" className="gap-1">
                     <MessageSquare className="w-4 h-4" /> Chat
+                    {adminUnread > 0 && (
+                      <span className="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold">
+                        {adminUnread}
+                      </span>
+                    )}
                   </Button>
                 </Link>
                 <Button variant="ghost" size="sm" onClick={logoutAdmin}>Logout</Button>
