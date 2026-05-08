@@ -12,14 +12,19 @@ interface ChatWidgetProps {
 
 const ChatWidget: React.FC<ChatWidgetProps> = ({ shipmentId, senderRole }) => {
   const [msg, setMsg] = useState('');
-  const { messages, addMessage } = useApp();
+  const { messages, addMessage, markMessagesRead } = useApp();
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const chatMessages = messages.filter(m => m.shipmentId === shipmentId);
+  const unread = chatMessages.filter(m => m.sender !== senderRole && !(senderRole === 'admin' ? m.readByAdmin : m.readByClient)).length;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages.length]);
+
+  useEffect(() => {
+    if (unread > 0) markMessagesRead(shipmentId, senderRole);
+  }, [shipmentId, senderRole, unread, markMessagesRead]);
 
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,7 +42,14 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ shipmentId, senderRole }) => {
   return (
     <Card>
       <CardHeader className="py-3">
-        <CardTitle className="text-base">Chat Support</CardTitle>
+        <CardTitle className="text-base flex items-center gap-2">
+          Chat Support
+          {unread > 0 && (
+            <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-destructive text-destructive-foreground text-xs font-bold">
+              {unread}
+            </span>
+          )}
+        </CardTitle>
       </CardHeader>
       <CardContent className="p-0">
         <div className="h-64 overflow-y-auto px-4 py-2 space-y-3">
