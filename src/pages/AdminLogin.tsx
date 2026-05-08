@@ -32,7 +32,7 @@ const AdminLogin: React.FC = () => {
             <Shield className="w-8 h-8 text-primary-foreground" />
           </div>
           <CardTitle className="text-2xl">Admin Login</CardTitle>
-          <p className="text-sm text-muted-foreground">Enter your credentials to access the dashboard</p>
+          <p className="text-sm text-muted-foreground">Enter your admin credentials to access the dashboard</p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">

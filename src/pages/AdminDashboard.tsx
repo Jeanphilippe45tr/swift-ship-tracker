@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useApp, generateTrackingNumber } from '@/context/AppContext';
 import type { Shipment } from '@/context/AppContext';
 import TrackingMap from '@/components/TrackingMap';
+import TicketsManager from '@/components/TicketsManager';
 import { useToast } from '@/hooks/use-toast';
 
 const statusColors: Record<string, string> = {
@@ -371,6 +372,7 @@ const AdminDashboard: React.FC = () => {
                   <div><span className="text-muted-foreground">ETA:</span> {viewShipment.estimatedArrival}</div>
                   <div><span className="text-muted-foreground">Status:</span> <Badge className={statusColors[viewShipment.status]}>{viewShipment.status}</Badge></div>
                 </div>
+                <TicketsManager shipment={viewShipment} />
               </div>
             )}
           </DialogContent>
