@@ -114,7 +114,8 @@ export const generateTicketPdf = (ticket: Ticket, shipmentInfo?: { trackingNumbe
   // Status stamp
   doc.setFontSize(40);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...(isPaid ? [34, 197, 94, 0.2] : [249, 115, 22, 0.2]) as any);
+  if (isPaid) doc.setTextColor(34, 197, 94); else doc.setTextColor(249, 115, 22);
+  (doc as any).setGState && (doc as any).setGState(new (jsPDF as any).GState({ opacity: 0.18 }));
   doc.text(isPaid ? 'PAID' : 'UNPAID', 105, 200, { align: 'center', angle: -20 });
 
   // Footer
