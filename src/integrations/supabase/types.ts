@@ -19,6 +19,8 @@ export type Database = {
           created_at: string
           id: string
           message: string
+          read_by_admin: boolean
+          read_by_client: boolean
           sender: string
           shipment_id: string
         }
@@ -26,6 +28,8 @@ export type Database = {
           created_at?: string
           id?: string
           message: string
+          read_by_admin?: boolean
+          read_by_client?: boolean
           sender: string
           shipment_id: string
         }
@@ -33,6 +37,8 @@ export type Database = {
           created_at?: string
           id?: string
           message?: string
+          read_by_admin?: boolean
+          read_by_client?: boolean
           sender?: string
           shipment_id?: string
         }
@@ -112,6 +118,54 @@ export type Database = {
           tracking_number?: string
           updated_at?: string
           weight?: string | null
+        }
+        Relationships: []
+      }
+      tickets: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          id: string
+          issued_by: string | null
+          issued_to: string | null
+          items: Json
+          notes: string | null
+          shipment_id: string
+          ticket_number: string
+          ticket_type: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          issued_by?: string | null
+          issued_to?: string | null
+          items?: Json
+          notes?: string | null
+          shipment_id: string
+          ticket_number: string
+          ticket_type?: string
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          issued_by?: string | null
+          issued_to?: string | null
+          items?: Json
+          notes?: string | null
+          shipment_id?: string
+          ticket_number?: string
+          ticket_type?: string
+          title?: string
+          updated_at?: string
         }
         Relationships: []
       }
